@@ -3,7 +3,8 @@
 Estado de **los 104 endpoints de lectura** del inventario oficial
 ([`loggro-api/inventory/restobar.md`](./loggro-api/inventory/restobar.md)). Las escrituras (59) y los
 endpoints de SuperAdmin están excluidos por diseño (solo lectura). Verificado contra la API real el
-2026-10-04 con `scripts/smoke-restobar.ts`: solo se registran estados HTTP, nombres de campo y tipos,
+2026-10-04 con `scripts/smoke-restobar.ts`: **las 41 herramientas respondieron OK en una ronda completa**
+(una llamada por herramienta). Solo se registran estados HTTP, nombres de campo y tipos,
 nunca valores.
 
 | Estado | Significado | Endpoints |

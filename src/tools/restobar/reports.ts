@@ -77,7 +77,7 @@ const STATS: GroupedStat[] = [
     listKey: 'paymentMethods',
     labelKey: 'paymentMethod',
     labelSources: ['paymentMethod', 'paymentMethodName', 'name'],
-    countLabel: 'Número de pagos o facturas.',
+    countLabel: 'Restobar no informa el conteo en este agrupamiento: siempre null.',
   },
   {
     name: 'restobar_sales_by_seller',
@@ -99,7 +99,7 @@ const STATS: GroupedStat[] = [
     listKey: 'tables',
     labelKey: 'table',
     labelSources: ['table', 'tableName', 'name'],
-    countLabel: 'Número de facturas.',
+    countLabel: 'Restobar no informa el conteo en este agrupamiento: siempre null.',
   },
   {
     name: 'restobar_sales_by_month',
@@ -152,7 +152,7 @@ const STATS: GroupedStat[] = [
     listKey: 'hours',
     labelKey: 'hour',
     labelSources: ['hour'],
-    countLabel: 'Número de pedidos.',
+    countLabel: 'Restobar no informa el conteo en este agrupamiento: siempre null.',
     sortByLabel: true,
     label: (row) => {
       // El grupo puede venir como `_id` numérico (MongoDB $hour).
@@ -170,7 +170,7 @@ const STATS: GroupedStat[] = [
     listKey: 'weekdays',
     labelKey: 'weekday',
     labelSources: ['dayOfWeek', 'day'],
-    countLabel: 'Número de pedidos.',
+    countLabel: 'Restobar no informa el conteo en este agrupamiento: siempre null.',
     sortByLabel: true,
     label: (row) => {
       // MongoDB $dayOfWeek: 1 = domingo … 7 = sábado.

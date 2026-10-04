@@ -168,8 +168,12 @@ export function registerExpenseTools(server: McpServer, ctx: RestobarToolContext
         byExpenseType: z.array(
           z.object({
             expenseType: nullableText,
-            subTotal: nullableNumber,
-            taxes: nullableNumber,
+            subTotal: nullableNumber.describe(
+              'Hoy Restobar solo envía el total en este reporte: suele ser null.',
+            ),
+            taxes: nullableNumber.describe(
+              'Hoy Restobar solo envía el total en este reporte: suele ser null.',
+            ),
             total: z.number(),
           }),
         ),
