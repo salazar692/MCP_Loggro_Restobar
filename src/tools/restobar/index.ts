@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import { registerCashTools } from './cash.ts';
 import { registerCatalogTools } from './catalog.ts';
 import { registerClientBulkTools } from './clients-bulk.ts';
 import { registerClientTools } from './clients.ts';
@@ -25,4 +26,5 @@ export function registerRestobarTools(server: McpServer, ctx: RestobarToolContex
   registerExpenseTools(server, ctx);
   registerInventoryTools(server, ctx);
   registerSettingsTools(server, ctx);
+  registerCashTools(server, ctx);
 }

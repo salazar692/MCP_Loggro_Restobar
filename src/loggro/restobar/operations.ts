@@ -6,8 +6,20 @@ import type { AllowedOperation } from '../../http/client.ts';
  * para el login); lo verifica tests/contract/restobar-allowlist.test.ts.
  */
 /** Consulta GET declarada en la allowlist (id `restobar.<nombre>`). */
-function read(name: string, path: string, docSlug: string): AllowedOperation {
-  return { id: `restobar.${name}`, kind: 'read', method: 'GET', path, docSlug };
+function read(
+  name: string,
+  path: string,
+  docSlug: string,
+  documentedPath?: string,
+): AllowedOperation {
+  return {
+    id: `restobar.${name}`,
+    kind: 'read',
+    method: 'GET',
+    path,
+    docSlug,
+    ...(documentedPath ? { documentedPath } : {}),
+  };
 }
 
 export const RESTOBAR_OPERATIONS = {
@@ -80,29 +92,21 @@ export const RESTOBAR_OPERATIONS = {
   listProviders: read('listProviders', '/providers', 'consultarproveedores'),
   listInventoryMovements: read(
     'listInventoryMovements',
-    '/inventory',
+    '/inventories',
     'consultarmovimientosinventario',
+    '/inventory',
   ),
-  getInventoryMovement: read('getInventoryMovement', '/inventory/{id}', 'consultarmovimientoporid'),
+  getInventoryMovement: read(
+    'getInventoryMovement',
+    '/inventories/{id}',
+    'consultarmovimientoporid',
+    '/inventory/{id}',
+  ),
   listInventoryTypes: read(
     'listInventoryTypes',
-    '/inventory/types/all',
+    '/inventories/types/all',
     'consultartiposinventario',
-  ),
-  inventoryPurchasesReport: read(
-    'inventoryPurchasesReport',
-    '/inventory/report/purchases',
-    'reportecomprasingredientes',
-  ),
-  inventoryProductionsReport: read(
-    'inventoryProductionsReport',
-    '/inventory/report/productions',
-    'reporteproduccioningredientes',
-  ),
-  inventoryTransfersReport: read(
-    'inventoryTransfersReport',
-    '/inventory/report/transfers',
-    'reportetrasladosingredientes',
+    '/inventory/types/all',
   ),
   listPurchasePayments: read(
     'listPurchasePayments',
@@ -115,11 +119,12 @@ export const RESTOBAR_OPERATIONS = {
   listTaxes: read('listTaxes', '/taxes', 'consultarimpuestos'),
   listTables: read('listTables', '/tables', 'consultarmesas'),
   listCashRegisters: read('listCashRegisters', '/cashRegisters', 'consultarcajasregistradoras'),
-  listCashClosings: read('listCashClosings', '/cashbox', 'consultarcuadrescaja'),
+  listCashClosings: read('listCashClosings', '/cashboxes', 'consultarcuadrescaja', '/cashbox'),
   listDeliveryProviders: read(
     'listDeliveryProviders',
-    '/deliveryProviders',
+    '/deliveryProvider',
     'consultarproveedoresdomicilio',
+    '/deliveryProviders',
   ),
   listPromos: read('listPromos', '/promos', 'consultarpromociones'),
   listOrderAreas: read('listOrderAreas', '/waiterOrderAreas', 'consultarareaspedido'),

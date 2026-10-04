@@ -34,6 +34,26 @@ import {
 const nullableText = z.string().nullable();
 const nullableNumber = z.number().nullable();
 const MAX_LINES = 200;
+const MAX_ITEMS = 30;
+
+/** Mapa id numérico → nombre de los tipos de movimiento. */
+function typeMap(body: unknown): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const r of rows(body)) {
+    const id = num(r.id) ?? num(r._id);
+    const name = text(r.name);
+    if (id !== null && name) map.set(String(id), name);
+  }
+  return map;
+}
+
+function direction(r: Raw): 'entrada' | 'salida' | 'producción' | 'traslado' | null {
+  if (r.isMoveTo === true) return 'traslado';
+  if (r.isProduction === true) return 'producción';
+  if (r.isSubtracted === true) return 'salida';
+  if (r.isSubtracted === false) return 'entrada';
+  return null;
+}
 
 interface MovementReport {
   name: string;
@@ -190,6 +210,151 @@ export function registerInventoryTools(server: McpServer, ctx: RestobarToolConte
       runTool(ctx.logger, 'restobar_get_product', async () => ({
         product: toProductOut(await ctx.restobar.getProduct(args.id)),
       })),
+  );
+
+  server.registerTool(
+    'restobar_list_inventory_movements',
+    {
+      title: 'Movimientos de inventario (Restobar)',
+      description: [
+        'Lista los movimientos de inventario de Restobar (entradas por compra, salidas, producción,',
+        'traslados y ajustes): fecha, tipo, proveedor, factura de compra (número, total, pagado), total y',
+        'los ítems movidos. Filtra por tipo (id de restobar_list_inventory_types), proveedor o número de',
+        'factura. Las respuestas son pesadas: máximo 10 por página. Solo lectura.',
+        UNTRUSTED_NOTE,
+      ].join(' '),
+      inputSchema: {
+        inventoryTypeId: z
+          .number()
+          .int()
+          .optional()
+          .describe('Tipo de movimiento (id numérico de restobar_list_inventory_types).'),
+        providerId: z.string().min(1).optional().describe('ID del proveedor.'),
+        invoiceNumber: z.string().min(1).optional().describe('Número de la factura de compra.'),
+        page: paginationInput.page,
+        pageSize: z
+          .number()
+          .int()
+          .min(1)
+          .max(10)
+          .default(5)
+          .describe('Movimientos por página (1 a 10).'),
+      },
+      outputSchema: {
+        movements: z.array(
+          z.object({
+            id: z.string(),
+            date: nullableText,
+            type: nullableText,
+            direction: z
+              .enum(['entrada', 'salida', 'producción', 'traslado'])
+              .nullable()
+              .describe('Según isSubtracted, isProduction e isMoveTo.'),
+            provider: nullableText,
+            invoiceNumber: nullableText,
+            invoiceTotal: nullableNumber,
+            invoicePaid: z.boolean().nullable(),
+            invoiceTotalPaid: nullableNumber,
+            total: nullableNumber,
+            note: nullableText,
+            itemCount: z.number(),
+            items: z
+              .array(
+                z.object({
+                  item: nullableText,
+                  quantity: nullableNumber,
+                  unitPrice: nullableNumber,
+                }),
+              )
+              .describe(`Primeros ${MAX_ITEMS} ítems del movimiento.`),
+          }),
+        ),
+        pagination: paginationOutput,
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
+    (args) =>
+      runTool(ctx.logger, 'restobar_list_inventory_movements', async () => {
+        const body = await ctx.restobar.read(OPS.listInventoryMovements, {
+          query: {
+            pagination: true,
+            ...toRestobarPage(args.page, args.pageSize),
+            inventoryTypeId: args.inventoryTypeId,
+            provider: args.providerId,
+            inventoryNumber: args.invoiceNumber,
+          },
+        });
+        const list = rows(body).filter((r) => r.deleted !== true);
+        const typeNames = list.some((r) => !text(r.typeName))
+          ? typeMap(await ctx.restobar.read(OPS.listInventoryTypes))
+          : undefined;
+        return {
+          movements: list.map((r) => {
+            const items = (Array.isArray(r.ingredients) ? r.ingredients : []).filter(isObject);
+            return {
+              id: refId(r) ?? '',
+              date: text(r.date) ?? text(r.createdOn),
+              type: text(r.typeName) ?? typeNames?.get(String(num(r.type))) ?? null,
+              direction: direction(r),
+              provider: refName(r.provider),
+              invoiceNumber: text(at(r, 'invoice.invoiceNumber')),
+              invoiceTotal: num(at(r, 'invoice.total')),
+              invoicePaid: bool(at(r, 'invoice.isPaid')),
+              invoiceTotalPaid: num(at(r, 'invoice.totalPaid')),
+              total: num(r.total),
+              note: text(r.note),
+              itemCount: items.length,
+              items: items.slice(0, MAX_ITEMS).map((i) => ({
+                item: refName(i.ingredient) ?? refName(i.product),
+                quantity: num(i.quantity),
+                unitPrice: num(i.price),
+              })),
+            };
+          }),
+          pagination: pageInfo(
+            args.page,
+            args.pageSize,
+            isObject(body) ? num(body.count) : null,
+            list.length,
+            'No recorras todas las páginas: filtra por tipo, proveedor o factura.',
+          ),
+        };
+      }),
+  );
+
+  server.registerTool(
+    'restobar_list_inventory_types',
+    {
+      title: 'Tipos de movimiento de inventario (Restobar)',
+      description:
+        'Lista los tipos de movimiento de inventario de Restobar (id numérico, nombre y si resta stock, es producción o es traslado). Sirve para filtrar restobar_list_inventory_movements. Solo lectura.',
+      inputSchema: {},
+      outputSchema: {
+        inventoryTypes: z.array(
+          z.object({
+            id: nullableNumber,
+            name: nullableText,
+            subtractsStock: z.boolean().nullable(),
+            isProduction: z.boolean().nullable(),
+            isTransfer: z.boolean().nullable(),
+          }),
+        ),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
+    () =>
+      runTool(ctx.logger, 'restobar_list_inventory_types', async () => {
+        const body = await ctx.restobar.read(OPS.listInventoryTypes);
+        return {
+          inventoryTypes: rows(body).map((r) => ({
+            id: num(r.id) ?? num(r._id),
+            name: text(r.name),
+            subtractsStock: bool(r.isSubtracted),
+            isProduction: bool(r.isProduction),
+            isTransfer: bool(r.isMoveTo),
+          })),
+        };
+      }),
   );
 
   for (const report of MOVEMENT_REPORTS) {

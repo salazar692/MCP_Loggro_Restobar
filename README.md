@@ -60,9 +60,11 @@ del negocio (por defecto `America/Bogota`).
 | `restobar_profitability_summary` | Ventas frente a gastos y compras de un período |
 | `restobar_list_expenses`, `restobar_expenses_summary`, `restobar_list_expense_types` | Gastos y egresos: detalle, totales por tipo y tipos de gasto |
 | `restobar_purchases_report`, `restobar_list_purchase_payments`, `restobar_list_providers` | Compras a proveedores, pagos de compras y proveedores |
+| `restobar_list_cash_closings` | Cuadres de caja: apertura, cierre, cajeros y, por método de pago, base, sistema, contado y diferencia |
+| `restobar_list_inventory_movements`, `restobar_list_inventory_types` | Movimientos de inventario (compras, salidas, producción, traslados) y sus tipos |
 | `restobar_list_ingredients`, `restobar_get_product` | Ingredientes con stock y alertas de stock bajo; detalle de un producto |
 | `restobar_production_report`, `restobar_transfers_report`, `restobar_shrinkage_report` | Producción, traslados entre bodegas y mermas de inventario |
-| `restobar_list_tables`, `restobar_list_taxes`, `restobar_list_units`, `restobar_list_promos` | Mesas, impuestos, unidades de medida y promociones |
+| `restobar_list_tables`, `restobar_list_taxes`, `restobar_list_units`, `restobar_list_promos`, `restobar_list_delivery_providers` | Mesas, impuestos, unidades de medida, promociones y proveedores de domicilio |
 
 Varios reportes requieren plan **premium** en Restobar; si el plan no lo permite, la herramienta lo
 explica. Estado de cada endpoint de la API en [`docs/restobar-tool-map.md`](docs/restobar-tool-map.md).

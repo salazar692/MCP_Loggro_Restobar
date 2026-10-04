@@ -465,3 +465,134 @@ describe('inventario y configuración', () => {
     expect(calls[0]?.method).toBe('GET');
   });
 });
+
+describe('caja, movimientos de inventario y domicilios (rutas reales)', () => {
+  it('restobar_list_cash_closings: usa /cashboxes, calcula diferencias y omite datos del usuario', async () => {
+    const { call, calls } = await connect(
+      byPath({
+        '/cashboxes': {
+          body: {
+            data: [
+              {
+                _id: 'cb1',
+                seq: 12,
+                isClosed: true,
+                dateStart: '2026-10-01T13:00:00.000Z',
+                dateEnd: '2026-10-02T04:00:00.000Z',
+                user: { _id: 'u1', name: 'Admin', email: 'admin@demo.co', phone: '300' },
+                cashiers: [{ _idUser: 'u2', name: 'Cajero Demo' }],
+                paymentMethods: [
+                  { paymentMethod: 'Efectivo', totalInit: 100, totalNow: 1000, totalCashier: 950 },
+                  {
+                    paymentMethod: '507f1f77bcf86cd799439011',
+                    totalInit: 0,
+                    totalNow: 500,
+                    totalCashier: 500,
+                  },
+                ],
+                expense: 30,
+                canceledInvoices: ['f1', 'f2'],
+              },
+            ],
+            count: 309,
+          },
+        },
+        '/paymentMethods': { body: [{ _id: '507f1f77bcf86cd799439011', name: 'Tarjeta' }] },
+      }),
+    );
+    const r = await call('restobar_list_cash_closings', {
+      status: 'closed',
+      ...PERIOD,
+      pageSize: 2,
+    });
+    expect(r.isError).toBeFalsy();
+    expect(pick(r, 'cashClosings.0')).toMatchObject({
+      number: 12,
+      isClosed: true,
+      cashiers: ['Cajero Demo'],
+      paymentMethods: [
+        { paymentMethod: 'Efectivo', initial: 100, system: 1000, counted: 950, difference: -50 },
+        { paymentMethod: 'Tarjeta', system: 500, counted: 500, difference: 0 },
+      ],
+      totals: { initial: 100, system: 1500, counted: 1450, difference: -50 },
+      expenses: 30,
+      canceledInvoices: 2,
+    });
+    expect(pick(r, 'pagination')).toMatchObject({ total: 309, hasMore: true });
+    expect(JSON.stringify(r.content)).not.toContain('admin@demo.co');
+    const q = calls[0]?.url.searchParams;
+    expect(calls[0]?.url.pathname).toBe('/cashboxes');
+    expect([q?.get('status'), q?.get('dateInit'), q?.get('limit')]).toEqual([
+      'closed',
+      '2026-09-26T05:00:00.000Z',
+      '2',
+    ]);
+  });
+
+  it('restobar_list_inventory_movements: usa /inventories, tipo por número y dirección', async () => {
+    const { call, calls } = await connect(
+      byPath({
+        '/inventories': {
+          body: {
+            data: [
+              {
+                _id: 'm1',
+                date: '2026-09-30T12:00:00.000Z',
+                type: 1,
+                isSubtracted: false,
+                provider: { _id: 'p1', name: 'Proveedor Demo' },
+                invoice: { invoiceNumber: 'C-9', isPaid: false, total: 800, totalPaid: 300 },
+                ingredients: [
+                  { ingredient: { _id: 'i1', name: 'Leche' }, quantity: 4, price: 200 },
+                ],
+                total: 800,
+              },
+            ],
+            count: 3,
+          },
+        },
+        '/inventories/types/all': { body: [{ id: 1, name: 'Compra', isSubtracted: false }] },
+      }),
+    );
+    const r = await call('restobar_list_inventory_movements', { inventoryTypeId: 1 });
+    expect(pick(r, 'movements.0')).toMatchObject({
+      type: 'Compra',
+      direction: 'entrada',
+      provider: 'Proveedor Demo',
+      invoiceNumber: 'C-9',
+      invoicePaid: false,
+      invoiceTotalPaid: 300,
+      itemCount: 1,
+      items: [{ item: 'Leche', quantity: 4, unitPrice: 200 }],
+    });
+    expect(calls[0]?.url.searchParams.get('inventoryTypeId')).toBe('1');
+  });
+
+  it('restobar_list_delivery_providers: usa /deliveryProvider', async () => {
+    const { call } = await connect(
+      byPath({
+        '/deliveryProvider': {
+          body: [
+            {
+              _id: 'd1',
+              name: 'Rappi',
+              isActive: true,
+              percentagePerSale: 20,
+              paymentMethod: { _id: 'pm', name: 'Rappi Pay' },
+            },
+          ],
+        },
+      }),
+    );
+    const r = await call('restobar_list_delivery_providers');
+    expect(pick(r, 'deliveryProviders')).toEqual([
+      {
+        id: 'd1',
+        name: 'Rappi',
+        isActive: true,
+        commissionPercentage: 20,
+        paymentMethod: 'Rappi Pay',
+      },
+    ]);
+  });
+});

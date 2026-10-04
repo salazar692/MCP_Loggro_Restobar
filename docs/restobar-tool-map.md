@@ -8,10 +8,10 @@ nunca valores.
 
 | Estado | Significado | Endpoints |
 | --- | --- | --- |
-| ✅ | Tiene herramienta y respondió bien con la API real | 34 |
-| ⛔ 404 | Documentado, pero la API real responde 404: no se puede implementar hoy | 8 |
+| ✅ | Tiene herramienta y respondió bien con la API real | 38 |
+| ⛔ | No disponible: la ruta documentada responde 404 y la real exige administrador (403) | 3 |
 | ⏸️ | Disponible, sin herramienta (duplicado, operativo o de poco uso); candidato futuro | 36 |
-| 🚫 | Excluido: consulta por ID redundante, vista de un rol operativo o efecto externo | 26 |
+| 🚫 | Excluido: consulta por ID redundante, vista de un rol operativo o efecto externo | 27 |
 
 ## Herramientas por tema
 
@@ -21,9 +21,10 @@ nunca valores.
 | Rentabilidad | `restobar_product_profitability`, `restobar_profitability_summary` |
 | Gastos | `restobar_list_expenses`, `restobar_expenses_summary`, `restobar_list_expense_types` |
 | Compras y proveedores | `restobar_purchases_report`, `restobar_list_purchase_payments`, `restobar_list_providers` |
-| Inventario | `restobar_list_ingredients`, `restobar_get_product`, `restobar_production_report`, `restobar_transfers_report`, `restobar_shrinkage_report` |
+| Caja | `restobar_list_cash_closings` |
+| Inventario | `restobar_list_inventory_movements`, `restobar_list_inventory_types`, `restobar_list_ingredients`, `restobar_get_product`, `restobar_production_report`, `restobar_transfers_report`, `restobar_shrinkage_report` |
 | Facturas, pedidos y clientes | `restobar_list_invoices`, `restobar_get_invoice`, `restobar_list_orders`, `restobar_list_clients`, `restobar_clients_summary`, `restobar_export_clients` (solo local) |
-| Catálogo y configuración | `restobar_list_products`, `restobar_list_categories`, `restobar_list_payment_methods`, `restobar_list_tables`, `restobar_list_taxes`, `restobar_list_units`, `restobar_list_promos` |
+| Catálogo y configuración | `restobar_list_products`, `restobar_list_categories`, `restobar_list_payment_methods`, `restobar_list_delivery_providers`, `restobar_list_tables`, `restobar_list_taxes`, `restobar_list_units`, `restobar_list_promos` |
 
 ### Equivalencias con lo pedido
 
@@ -33,13 +34,18 @@ nunca valores.
 | `restobar_expenses_summary` (total por período/categoría) | `restobar_expenses_summary` (y `byExpenseType` en `restobar_list_expenses`) |
 | `restobar_purchase_report` / `restobar_supplier_purchases` | `restobar_purchases_report` (líneas + `byProvider`) |
 | `restobar_ingredient_purchases` | `restobar_purchases_report` (cada línea es un ingrediente) |
-| `restobar_inventory_movements` | ⛔ `/inventory` responde 404. Parcial: producción, traslados y mermas |
+| `restobar_inventory_movements` | `restobar_list_inventory_movements` (ruta real `/inventories`) |
 | `restobar_inventory_transfers` | `restobar_transfers_report` |
 | `restobar_purchase_payments` | `restobar_list_purchase_payments` |
 | `restobar_sales_summary` | `restobar_sales_by_day`, `restobar_sales_by_month` y las demás de ventas |
 | `restobar_profitability_summary` | `restobar_profitability_summary` y `restobar_product_profitability` |
 
 ## Notas de la API real
+
+- **Rutas mal documentadas:** la documentación oficial escribe `/cashbox`, `/inventory` y
+  `/deliveryProviders`, pero la API responde «Cannot GET …» (ruta inexistente). Las rutas reales son
+  `/cashboxes`, `/inventories` y `/deliveryProvider`. En la allowlist cada operación guarda la ruta real
+  en `path` y la documentada en `documentedPath`; la prueba de contrato verifica la documentada.
 
 - **Fechas:** los reportes y estadísticas reciben `dateInitISO`/`dateEndISO`; `/expenses`, `dateInit`/`dateEnd`.
   Las herramientas convierten `YYYY-MM-DD` a 00:00–23:59:59.999 de la zona del negocio. Verificado: las
@@ -64,15 +70,15 @@ nunca valores.
 | `/ingredients` | ✅ | `restobar_list_ingredients` | [consultaringredientes](https://developer.loggro.com/reference/consultaringredientes) |
 | `/ingredients/onlyIngredient` | ⏸️ | `restobar_list_ingredients` cubre la búsqueda. | [consultarsoloingredientes](https://developer.loggro.com/reference/consultarsoloingredientes) |
 | `/ingredients/{id}` | 🚫 | Consulta por ID: el listado ya trae el registro y algunas exigen permisos de escritura. | [consultaringredienteporid](https://developer.loggro.com/reference/consultaringredienteporid) |
-| `/inventory` | ⛔ 404 | La API real responde 404 (2026-10-04). Sin movimientos de inventario por ahora. | [consultarmovimientosinventario](https://developer.loggro.com/reference/consultarmovimientosinventario) |
-| `/inventory/types/all` | ⛔ 404 | La API real responde 404. | [consultartiposinventario](https://developer.loggro.com/reference/consultartiposinventario) |
-| `/inventory/{id}` | ⛔ 404 | Depende de `/inventory`. | [consultarmovimientoporid](https://developer.loggro.com/reference/consultarmovimientoporid) |
-| `/inventory/report/purchases` | ⛔ 404 | 404; se usa `/reports/reportPurchase`. | [reportecomprasingredientes](https://developer.loggro.com/reference/reportecomprasingredientes) |
-| `/inventory/report/productions` | ⛔ 404 | 404; se usa `/reports/reportProduction`. | [reporteproduccioningredientes](https://developer.loggro.com/reference/reporteproduccioningredientes) |
-| `/inventory/report/transfers` | ⛔ 404 | 404; se usa `/reports/reportTransfers`. | [reportetrasladosingredientes](https://developer.loggro.com/reference/reportetrasladosingredientes) |
+| `/inventory` | ✅ | `restobar_list_inventory_movements`. **Ruta real: `/inventories`**. | [consultarmovimientosinventario](https://developer.loggro.com/reference/consultarmovimientosinventario) |
+| `/inventory/types/all` | ✅ | `restobar_list_inventory_types`. **Ruta real: `/inventories/types/all`**. | [consultartiposinventario](https://developer.loggro.com/reference/consultartiposinventario) |
+| `/inventory/{id}` | 🚫 | Ruta real probable `/inventories/{id}`; el listado ya trae el movimiento. | [consultarmovimientoporid](https://developer.loggro.com/reference/consultarmovimientoporid) |
+| `/inventory/report/purchases` | ⛔ 403 | Ruta real `/inventories/report/purchases`: «Solo usuarios administradores». Se usa `/reports/reportPurchase`. | [reportecomprasingredientes](https://developer.loggro.com/reference/reportecomprasingredientes) |
+| `/inventory/report/productions` | ⛔ | Ruta documentada 404; se usa `/reports/reportProduction`. | [reporteproduccioningredientes](https://developer.loggro.com/reference/reporteproduccioningredientes) |
+| `/inventory/report/transfers` | ⛔ | Ruta documentada 404; se usa `/reports/reportTransfers`. | [reportetrasladosingredientes](https://developer.loggro.com/reference/reportetrasladosingredientes) |
 | `/clients` | ✅ | `restobar_list_clients`, `restobar_clients_summary`, `restobar_export_clients` | [consultarclientes](https://developer.loggro.com/reference/consultarclientes) |
 | `/clients/{id}` | 🚫 | Consulta por ID: el listado ya trae el registro y algunas exigen permisos de escritura. | [consultarclienteporid](https://developer.loggro.com/reference/consultarclienteporid) |
-| `/deliveryProviders` | ⛔ 404 | La API real responde 404. Las ventas por canal salen de `restobar_sales_by_delivery_provider`. | [consultarproveedoresdomicilio](https://developer.loggro.com/reference/consultarproveedoresdomicilio) |
+| `/deliveryProviders` | ✅ | `restobar_list_delivery_providers`. **Ruta real: `/deliveryProvider`** (singular). | [consultarproveedoresdomicilio](https://developer.loggro.com/reference/consultarproveedoresdomicilio) |
 | `/deliveryProviders/{id}` | 🚫 | Consulta por ID: el listado ya trae el registro y algunas exigen permisos de escritura. | [consultarproveedordomicilioporid](https://developer.loggro.com/reference/consultarproveedordomicilioporid) |
 | `/events` | ⏸️ | Responde 200; eventos del negocio, poco uso. Candidato futuro. | [consultareventos](https://developer.loggro.com/reference/consultareventos) |
 | `/events/{id}` | 🚫 | Consulta por ID: el listado ya trae el registro y algunas exigen permisos de escritura. | [consultareventoporid](https://developer.loggro.com/reference/consultareventoporid) |
@@ -155,7 +161,7 @@ nunca valores.
 | `/typeExpenses/{id}` | 🚫 | Consulta por ID: el listado ya trae el registro y algunas exigen permisos de escritura. | [consultartipogastoporid](https://developer.loggro.com/reference/consultartipogastoporid) |
 | `/cashRegisters` | ⏸️ | Responde 200 pero vacío en el negocio de prueba; poco útil para el modelo. | [consultarcajasregistradoras](https://developer.loggro.com/reference/consultarcajasregistradoras) |
 | `/cashRegisters/{id}` | 🚫 | Consulta por ID: el listado ya trae el registro y algunas exigen permisos de escritura. | [consultarcajaregistradoraporid](https://developer.loggro.com/reference/consultarcajaregistradoraporid) |
-| `/cashbox` | ⛔ 404 | La API real responde 404: sin cuadres de caja por ahora. | [consultarcuadrescaja](https://developer.loggro.com/reference/consultarcuadrescaja) |
+| `/cashbox` | ✅ | `restobar_list_cash_closings`. **Ruta real: `/cashboxes`** (la documentada responde «Cannot GET /cashbox»). | [consultarcuadrescaja](https://developer.loggro.com/reference/consultarcuadrescaja) |
 | `/promos` | ✅ | `restobar_list_promos` | [consultarpromociones](https://developer.loggro.com/reference/consultarpromociones) |
 | `/promos/{id}` | 🚫 | Consulta por ID: el listado ya trae el registro y algunas exigen permisos de escritura. | [consultarpromocionporid](https://developer.loggro.com/reference/consultarpromocionporid) |
 | `/roles` | 🚫 | Roles y permisos internos (`RO_GET_ALL`). | [consultarroles](https://developer.loggro.com/reference/consultarroles) |

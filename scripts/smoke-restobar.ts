@@ -33,7 +33,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { loadConfig } from '../src/config.ts';
-import { HttpClient } from '../src/http/client.ts';
+import { HttpClient, type AllowedOperation } from '../src/http/client.ts';
 import { StaticTokenProvider } from '../src/loggro/restobar/auth.ts';
 import { RestobarClient } from '../src/loggro/restobar/client.ts';
 import { RESTOBAR_ALLOWLIST, RESTOBAR_OPERATIONS } from '../src/loggro/restobar/operations.ts';
@@ -157,10 +157,58 @@ const PLAN: Step[] = [
   { tool: 'restobar_list_taxes', args: () => ({}) },
   { tool: 'restobar_list_units', args: () => ({}) },
   { tool: 'restobar_list_promos', args: () => ({}) },
+  { tool: 'restobar_list_cash_closings', args: () => ({ pageSize: PAGE_SIZE }) },
+  {
+    tool: 'restobar_list_cash_closings',
+    args: () => ({ status: 'closed', ...lastWeek() }),
+    note: 'cerrados, últimos 7 días',
+  },
+  { tool: 'restobar_list_inventory_movements', args: () => ({ pageSize: PAGE_SIZE }) },
+  { tool: 'restobar_list_inventory_types', args: () => ({}) },
+  { tool: 'restobar_list_delivery_providers', args: () => ({}) },
 ];
 
-type OpName = keyof typeof RESTOBAR_OPERATIONS;
 type ProbeQuery = Record<string, string | number | boolean>;
+type Probe = [name: string, op: AllowedOperation, query: ProbeQuery];
+
+/**
+ * Rutas solo para diagnosticar endpoints documentados que responden 404 (p. ej. cuadres de caja):
+ * variantes de mayúsculas, plural y barra final, y endpoints relacionados. Todas GET; no forman parte
+ * de la allowlist del servidor.
+ */
+const diag = (name: string, path: string, docSlug: string): AllowedOperation => ({
+  id: `diagnostic.${name}`,
+  kind: 'read',
+  method: 'GET',
+  path,
+  docSlug,
+});
+const DIAGNOSTIC_OPS = {
+  cashbox: diag('cashbox', '/cashbox', 'consultarcuadrescaja'),
+  cashboxSlash: diag('cashboxSlash', '/cashbox/', 'consultarcuadrescaja'),
+  cashBox: diag('cashBox', '/cashBox', 'consultarcuadrescaja'),
+  cashboxes: diag('cashboxes', '/cashboxes', 'consultarcuadrescaja'),
+  cashBoxes: diag('cashBoxes', '/cashBoxes', 'consultarcuadrescaja'),
+  currentCashBoxTotal: diag(
+    'currentCashBoxTotal',
+    '/stats/admin/totalInvoicesCurrentCashBox',
+    'gettotalinvoicescurrentcashbox',
+  ),
+  inventory: diag('inventory', '/inventory', 'consultarmovimientosinventario'),
+  deliveryProviders: diag(
+    'deliveryProviders',
+    '/deliveryProviders',
+    'consultarproveedoresdomicilio',
+  ),
+  inventories: diag('inventories', '/inventories', 'consultarmovimientosinventario'),
+  inventoriesTypes: diag('inventoriesTypes', '/inventories/types/all', 'consultartiposinventario'),
+  inventoriesPurchases: diag(
+    'inventoriesPurchases',
+    '/inventories/report/purchases',
+    'reportecomprasingredientes',
+  ),
+  deliveryProvider: diag('deliveryProvider', '/deliveryProvider', 'consultarproveedoresdomicilio'),
+} satisfies Record<string, AllowedOperation>;
 
 /** Últimos 7 días completos (hasta ayer) en hora de Colombia, como instantes ISO. */
 function lastWeekIso(): { start: string; end: string } {
@@ -169,50 +217,74 @@ function lastWeekIso(): { start: string; end: string } {
 }
 
 /** Operaciones a sondear y su consulta: fechas en los dos nombres que usa Restobar según el endpoint. */
-function probes(): [OpName, ProbeQuery][] {
+function probes(): Probe[] {
   const { start, end } = lastWeekIso();
   const iso = { dateInitISO: start, dateEndISO: end };
   const plain = { dateInit: start, dateEnd: end };
   const paged = { pagination: true, limit: 5, page: 0 };
   return [
-    ['listExpenses', plain],
-    ['reportExpenses', plain],
-    ['listExpenseTypes', {}],
-    ['listProviders', {}],
-    ['listInventoryMovements', paged],
-    ['listInventoryTypes', {}],
-    ['inventoryPurchasesReport', iso],
-    ['inventoryProductionsReport', iso],
-    ['inventoryTransfersReport', iso],
-    ['listPurchasePayments', {}],
-    ['reportPurchases', iso],
-    ['reportProduction', iso],
-    ['reportTransfers', iso],
-    ['reportShrinkage', iso],
-    ['reportUtility', { ...iso, groupResult: true }],
-    ['reportUtilityByExpenseType', iso],
-    ['reportUtilityByDeliveryProvider', iso],
-    ['reportSalesByProduct', { ...iso, groupResult: true }],
-    ['reportSalesByCategory', iso],
-    ['salesByMonth', iso],
-    ['salesByTable', iso],
-    ['salesByPaymentMethod', iso],
-    ['salesByProduct', iso],
-    ['salesBySeller', iso],
-    ['salesByBiller', iso],
-    ['salesByDeliveryProvider', iso],
-    ['ordersByHour', iso],
-    ['ordersByWeekday', iso],
-    ['listIngredients', paged],
-    ['listUnits', {}],
-    ['listTaxes', {}],
-    ['listTables', {}],
-    ['listCashRegisters', {}],
-    ['listCashClosings', { ...paged, ...plain }],
-    ['listDeliveryProviders', {}],
-    ['listPromos', {}],
-    ['listOrderAreas', {}],
-    ['listEvents', { limit: 5 }],
+    ['listExpenses', RESTOBAR_OPERATIONS.listExpenses, plain],
+    ['reportExpenses', RESTOBAR_OPERATIONS.reportExpenses, plain],
+    ['listExpenseTypes', RESTOBAR_OPERATIONS.listExpenseTypes, {}],
+    ['listProviders', RESTOBAR_OPERATIONS.listProviders, {}],
+    ['listInventoryMovements', RESTOBAR_OPERATIONS.listInventoryMovements, paged],
+    ['listInventoryTypes', RESTOBAR_OPERATIONS.listInventoryTypes, {}],
+    ['listPurchasePayments', RESTOBAR_OPERATIONS.listPurchasePayments, {}],
+    ['reportPurchases', RESTOBAR_OPERATIONS.reportPurchases, iso],
+    ['reportProduction', RESTOBAR_OPERATIONS.reportProduction, iso],
+    ['reportTransfers', RESTOBAR_OPERATIONS.reportTransfers, iso],
+    ['reportShrinkage', RESTOBAR_OPERATIONS.reportShrinkage, iso],
+    ['reportUtility', RESTOBAR_OPERATIONS.reportUtility, { ...iso, groupResult: true }],
+    ['reportUtilityByExpenseType', RESTOBAR_OPERATIONS.reportUtilityByExpenseType, iso],
+    ['reportUtilityByDeliveryProvider', RESTOBAR_OPERATIONS.reportUtilityByDeliveryProvider, iso],
+    [
+      'reportSalesByProduct',
+      RESTOBAR_OPERATIONS.reportSalesByProduct,
+      { ...iso, groupResult: true },
+    ],
+    ['reportSalesByCategory', RESTOBAR_OPERATIONS.reportSalesByCategory, iso],
+    ['salesByMonth', RESTOBAR_OPERATIONS.salesByMonth, iso],
+    ['salesByTable', RESTOBAR_OPERATIONS.salesByTable, iso],
+    ['salesByPaymentMethod', RESTOBAR_OPERATIONS.salesByPaymentMethod, iso],
+    ['salesByProduct', RESTOBAR_OPERATIONS.salesByProduct, iso],
+    ['salesBySeller', RESTOBAR_OPERATIONS.salesBySeller, iso],
+    ['salesByBiller', RESTOBAR_OPERATIONS.salesByBiller, iso],
+    ['salesByDeliveryProvider', RESTOBAR_OPERATIONS.salesByDeliveryProvider, iso],
+    ['ordersByHour', RESTOBAR_OPERATIONS.ordersByHour, iso],
+    ['ordersByWeekday', RESTOBAR_OPERATIONS.ordersByWeekday, iso],
+    ['listIngredients', RESTOBAR_OPERATIONS.listIngredients, paged],
+    ['listUnits', RESTOBAR_OPERATIONS.listUnits, {}],
+    ['listTaxes', RESTOBAR_OPERATIONS.listTaxes, {}],
+    ['listTables', RESTOBAR_OPERATIONS.listTables, {}],
+    ['listCashRegisters', RESTOBAR_OPERATIONS.listCashRegisters, {}],
+    ['listCashClosings', RESTOBAR_OPERATIONS.listCashClosings, { ...paged, ...plain }],
+    ['listDeliveryProviders', RESTOBAR_OPERATIONS.listDeliveryProviders, {}],
+    ['listPromos', RESTOBAR_OPERATIONS.listPromos, {}],
+    ['listOrderAreas', RESTOBAR_OPERATIONS.listOrderAreas, {}],
+    ['listEvents', RESTOBAR_OPERATIONS.listEvents, { limit: 5 }],
+    // Diagnóstico de cuadres de caja: ejemplo de la documentación, sin parámetros, por estado, variantes de
+    // ruta y el total de la caja actual. Más los otros 404, sin parámetros, para comparar el error.
+    ['cashbox:ejemploDoc', DIAGNOSTIC_OPS.cashbox, { pagination: true, limit: 20, page: 0 }],
+    ['cashbox:sinParametros', DIAGNOSTIC_OPS.cashbox, {}],
+    ['cashbox:abiertos', DIAGNOSTIC_OPS.cashbox, { status: 'open' }],
+    ['cashbox:cerrados', DIAGNOSTIC_OPS.cashbox, { status: 'closed' }],
+    ['cashbox:barraFinal', DIAGNOSTIC_OPS.cashboxSlash, {}],
+    ['cashbox:cashBox', DIAGNOSTIC_OPS.cashBox, {}],
+    ['cashbox:cashboxes', DIAGNOSTIC_OPS.cashboxes, {}],
+    ['cashbox:cashBoxes', DIAGNOSTIC_OPS.cashBoxes, {}],
+    ['cashbox:totalCajaActual', DIAGNOSTIC_OPS.currentCashBoxTotal, {}],
+    ['cashboxes:paginado', DIAGNOSTIC_OPS.cashboxes, { pagination: true, limit: 2, page: 0 }],
+    [
+      'cashboxes:cerradosSemana',
+      DIAGNOSTIC_OPS.cashboxes,
+      { pagination: true, limit: 50, page: 0, status: 'closed', ...plain },
+    ],
+    ['inventory:sinParametros', DIAGNOSTIC_OPS.inventory, {}],
+    ['inventories:paginado', DIAGNOSTIC_OPS.inventories, paged],
+    ['inventories:tipos', DIAGNOSTIC_OPS.inventoriesTypes, {}],
+    ['inventories:compras', DIAGNOSTIC_OPS.inventoriesPurchases, iso],
+    ['deliveryProvider:singular', DIAGNOSTIC_OPS.deliveryProvider, {}],
+    ['deliveryProviders:sinParametros', DIAGNOSTIC_OPS.deliveryProviders, {}],
   ];
 }
 
@@ -452,6 +524,11 @@ async function main(): Promise<void> {
     const res = await fetch(url, init);
     const bytes = (await res.clone().arrayBuffer()).byteLength;
     console.log(`  ← HTTP ${res.status}, ${(bytes / 1024).toFixed(1)} KB`);
+    if (process.env.SMOKE_PROBE === '1' && !res.ok && bytes < 1024) {
+      // Cuerpo corto del error (p. ej. «Cannot GET /x» o un mensaje JSON), con los números enmascarados.
+      const text = (await res.clone().text()).replace(/\s+/g, ' ').replace(/\d{3,}/g, '###');
+      console.log(`  cuerpo del error: ${text.slice(0, 200)}`);
+    }
     if (process.env.SMOKE_RAW_SHAPE === '1' && res.ok) {
       // Campos y tipos de la respuesta cruda (sin valores): contrasta la API con schemas.ts.
       const raw: unknown = await res
@@ -466,7 +543,7 @@ async function main(): Promise<void> {
 
   const http = new HttpClient({
     baseUrl: config.restobar.baseUrl,
-    allowlist: RESTOBAR_ALLOWLIST,
+    allowlist: [...RESTOBAR_ALLOWLIST, ...Object.values(DIAGNOSTIC_OPS)],
     fetch: guardedFetch,
     maxRetries: 0,
     logger: silentLogger,
@@ -475,10 +552,10 @@ async function main(): Promise<void> {
   if (env.SMOKE_PROBE === '1') {
     const selected = probes().filter(([name]) => !only.size || only.has(name));
     try {
-      for (const [name, query] of selected) {
+      for (const [name, op, query] of selected) {
         currentTool = `probe:${name}`;
-        const op = RESTOBAR_OPERATIONS[name];
-        console.log(`\n# ${name} (${op.path})`);
+        const params = Object.keys(query).join(', ') || 'sin parámetros';
+        console.log(`\n# ${name} (${op.path}; ${params})`);
         if ((ledger[currentTool] ?? 0) >= MAX_REQUESTS_PER_TOOL) {
           console.log('  omitida: presupuesto de solicitudes agotado');
           continue;

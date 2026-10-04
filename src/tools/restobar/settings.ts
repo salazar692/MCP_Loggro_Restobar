@@ -107,6 +107,43 @@ export function registerSettingsTools(server: McpServer, ctx: RestobarToolContex
   );
 
   server.registerTool(
+    'restobar_list_delivery_providers',
+    {
+      title: 'Proveedores de domicilio (Restobar)',
+      description:
+        'Lista los proveedores de domicilio configurados en Restobar (Rappi, propio…): nombre, si está activo, comisión por venta (%) y método de pago asociado. Solo lectura.',
+      inputSchema: {},
+      outputSchema: {
+        deliveryProviders: z.array(
+          z.object({
+            id: z.string(),
+            name: nullableText,
+            isActive: z.boolean().nullable(),
+            commissionPercentage: nullableNumber,
+            paymentMethod: nullableText,
+          }),
+        ),
+      },
+      annotations: READ_ONLY_ANNOTATIONS,
+    },
+    () =>
+      runTool(ctx.logger, 'restobar_list_delivery_providers', async () => {
+        const body = await ctx.restobar.read(OPS.listDeliveryProviders);
+        return {
+          deliveryProviders: rows(body)
+            .filter(active)
+            .map((r) => ({
+              id: refId(r) ?? '',
+              name: text(r.name),
+              isActive: bool(r.isActive),
+              commissionPercentage: num(r.percentagePerSale),
+              paymentMethod: text(r.paymentMethod),
+            })),
+        };
+      }),
+  );
+
+  server.registerTool(
     'restobar_list_promos',
     {
       title: 'Promociones (Restobar)',

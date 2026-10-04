@@ -15,6 +15,12 @@ export interface AllowedOperation {
   readonly path: string;
   /** Página oficial: https://developer.loggro.com/reference/<docSlug> */
   readonly docSlug: string;
+  /**
+   * Ruta tal como la escribe la documentación oficial, solo si difiere de la real (`path`). Verificado
+   * contra la API: p. ej. la doc dice `/cashbox` y la API responde «Cannot GET /cashbox»; la ruta real
+   * es `/cashboxes`. La prueba de contrato compara el inventario con esta ruta.
+   */
+  readonly documentedPath?: string;
 }
 
 export type QueryValue = string | number | boolean | undefined;
