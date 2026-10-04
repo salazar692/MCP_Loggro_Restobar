@@ -20,6 +20,7 @@
  *      NODE_USE_ENV_PROXY=1 node scripts/smoke-restobar.ts [herramienta ...]   (nube, detrás de proxy)
  * Con SMOKE_RAW_SHAPE=1 imprime además los campos y tipos de la respuesta cruda (sin valores),
  * combinando todos los elementos. SMOKE_INVOICE_ID=<id> fija la factura de restobar_get_invoice.
+ * SMOKE_HEADERS=1 imprime los nombres de las cabeceras de respuesta (sin valores) y su codificación.
  * Con SMOKE_PROBE=1 no usa herramientas: consulta directamente las operaciones de PROBES (o las
  * nombradas como argumento) e imprime estado, conteo y rango de fechas (con SMOKE_RAW_SHAPE=1, también
  * la forma cruda). Cada
@@ -541,6 +542,16 @@ async function main(): Promise<void> {
     const res = await fetch(url, init);
     const bytes = (await res.clone().arrayBuffer()).byteLength;
     console.log(`  ← HTTP ${res.status}, ${(bytes / 1024).toFixed(1)} KB`);
+    if (process.env.SMOKE_HEADERS === '1') {
+      // Solo nombres de cabeceras (sin valores), más codificación y si algún valor trae bytes no ASCII:
+      // sirve para comparar respuestas que un runtime distinto podría rechazar.
+      const names = [...res.headers.keys()].sort().join(', ');
+      const nonAscii = [...res.headers].filter(([, v]) => /[^\x20-\x7e]/.test(v)).map(([k]) => k);
+      console.log(`  cabeceras: ${names}`);
+      console.log(
+        `  content-encoding: ${res.headers.get('content-encoding') ?? '—'}; transfer-encoding: ${res.headers.get('transfer-encoding') ?? '—'}; valores no ASCII en: ${nonAscii.join(', ') || 'ninguno'}`,
+      );
+    }
     if (process.env.SMOKE_PROBE === '1' && !res.ok && bytes < 1024) {
       // Cuerpo corto del error (p. ej. «Cannot GET /x» o un mensaje JSON), con los números enmascarados.
       const text = (await res.clone().text()).replace(/\s+/g, ' ').replace(/\d{3,}/g, '###');
