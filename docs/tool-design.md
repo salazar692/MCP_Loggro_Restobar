@@ -41,6 +41,40 @@
 | Moneda | Se devuelven los valores numéricos tal cual, sin símbolo de moneda. | ❓ Restobar no documenta el campo de moneda |
 | IDs | Los IDs de Restobar (`_id`) se exponen como `id`. | ✅ |
 
+### 2.1 Límites de paginación: obligatorios, no opcionales
+
+> ⚠️ **Un límite de página alto hace fallar las herramientas pesadas.** Con productos, un `limit` de
+> 500 pide unos 10 MB: supera el tope de respuesta del cliente HTTP (5 MB) y se acerca al tiempo de
+> espera (20 s). El resultado es un error («respuesta demasiado grande» o «No fue posible conectar con
+> Restobar» si vence el tiempo), no más datos. **No subas `MAX_PAGE_SIZE` ni expongas un `limit`
+> mayor en un servidor que integre esta librería.**
+
+Qué dice la documentación oficial y qué se observó en la API real (2026-10-04):
+
+| Endpoint | Máximo documentado de `limit` | Peso medido por registro | Límite en el MCP |
+| --- | --- | --- | --- |
+| `/products` | 100 (**no lo hace cumplir**: `limit=101` devolvió 101) | ≈ 21 KB | 50 por página (≈ 1 MB) |
+| `/inventories` (movimientos) | 10 000 | ≈ 160 KB (trae los ítems poblados) | 10 por página |
+| `/orders` | 3 000 | ≈ 7 KB | 50 por página |
+| `/invoices` | 5 000 | — | 50 por página |
+| `/clients` | 10 000 | — | 50 por página; resumen y exportación en lotes de 500 |
+| `/ingredients` | 15 000 | ≈ 2 KB | 50 por página |
+| `/cashboxes` (cuadres) | 999 | ≈ 3,5 KB | 50 por página. **Sin `pagination=true` devuelve todos** (309 cuadres ≈ 1 MB) |
+| `/categories`, `/paymentMethods`, `/providers`, `/taxes`, `/units`, `/tables`, `/typeExpenses`, `/promos` | Sin paginación: siempre devuelven todo | pequeños | Los parámetros de paginación se **ignoran sin error** (probado con `/categories`). Salida acotada a 200 filas donde aplica |
+| `/expenses`, `/reports/*`, `/stats/*` | Sin paginación: los acota el período | — | Período obligatorio, máximo 93 días; salida acotada (200 líneas, `top` hasta 200) |
+
+Reglas:
+
+1. **Nunca ilimitado.** La documentación no exige límite y varios endpoints aceptan miles de registros,
+   pero una respuesta grande es lenta, puede fallar por tamaño o tiempo y llena el contexto del modelo
+   sin aportar: el modelo no puede leer miles de filas. El límite lo pone el MCP, no Restobar.
+2. **Siempre `pagination=true`** en los endpoints que paginan: sin él, algunos (p. ej. `/cashboxes`)
+   devuelven todo de una vez.
+3. **Para totales, `pagination.total`;** para cifras de todo el universo, herramientas de resumen
+   (`restobar_clients_summary`) o estadísticas por período, no recorrer páginas.
+4. **Defensas del transporte:** 5 MB máximo por respuesta y 20 s de espera (`src/http/client.ts`). Si se
+   cambian, revisar esta tabla.
+
 ## 3. Catálogo inicial propuesto — Restobar (fase 1)
 
 Prioridad **P1** = conjunto mínimo para validar con credenciales reales. **P2** = siguientes, incluidos

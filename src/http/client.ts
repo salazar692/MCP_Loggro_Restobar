@@ -103,7 +103,10 @@ export function buildUrl(
 async function readLimited(res: Response, maxBytes: number): Promise<string> {
   const declared = Number(res.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) {
-    throw new LoggroError('invalid_response', 'La respuesta de Restobar es demasiado grande.');
+    throw new LoggroError(
+      'invalid_response',
+      'La respuesta de Restobar es demasiado grande. Usa una página más pequeña (pageSize) o un rango de fechas más corto.',
+    );
   }
   if (!res.body) return '';
   const reader = (res.body as ReadableStream<Uint8Array>).getReader();
@@ -115,7 +118,10 @@ async function readLimited(res: Response, maxBytes: number): Promise<string> {
     total += value.byteLength;
     if (total > maxBytes) {
       await reader.cancel();
-      throw new LoggroError('invalid_response', 'La respuesta de Restobar es demasiado grande.');
+      throw new LoggroError(
+        'invalid_response',
+        'La respuesta de Restobar es demasiado grande. Usa una página más pequeña (pageSize) o un rango de fechas más corto.',
+      );
     }
     chunks.push(value);
   }

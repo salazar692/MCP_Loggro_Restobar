@@ -279,6 +279,23 @@ function probes(): Probe[] {
       DIAGNOSTIC_OPS.cashboxes,
       { pagination: true, limit: 50, page: 0, status: 'closed', ...plain },
     ],
+    // Límites: ¿qué hace la API por encima del máximo documentado (productos: 100) y con parámetros
+    // de paginación en un endpoint que no pagina (categorías)?
+    [
+      'limite:productos101',
+      RESTOBAR_OPERATIONS.listProducts,
+      { pagination: true, limit: 101, page: 0 },
+    ],
+    [
+      'limite:productos20',
+      RESTOBAR_OPERATIONS.listProducts,
+      { pagination: true, limit: 20, page: 0 },
+    ],
+    [
+      'limite:categoriasPaginadas',
+      RESTOBAR_OPERATIONS.listCategories,
+      { pagination: true, limit: 5, page: 0 },
+    ],
     ['inventory:sinParametros', DIAGNOSTIC_OPS.inventory, {}],
     ['inventories:paginado', DIAGNOSTIC_OPS.inventories, paged],
     ['inventories:tipos', DIAGNOSTIC_OPS.inventoriesTypes, {}],

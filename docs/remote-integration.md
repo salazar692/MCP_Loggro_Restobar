@@ -90,6 +90,12 @@ dicen al modelo que use `restobar_clients_summary`.
 cualquier entorno que los tenga (Node.js 22+, Deno, Bun) y con cualquier framework o hosting. Con
 Express, el SDK ofrece `StreamableHTTPServerTransport`.
 
+### Límites de página
+
+No amplíes los límites de las herramientas (por ejemplo, aceptando `limit` hasta 500): con productos, 500
+registros pesan unos 10 MB y la consulta falla por tamaño o por tiempo. Detalle y tabla por endpoint en
+[`tool-design.md` §2.1](./tool-design.md#21-límites-de-paginación-obligatorios-no-opcionales).
+
 ## 3. `TokenProvider`: de dónde sale el token
 
 ```ts
