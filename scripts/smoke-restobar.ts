@@ -202,6 +202,8 @@ const DIAGNOSTIC_OPS = {
     'consultarproveedoresdomicilio',
   ),
   inventories: diag('inventories', '/inventories', 'consultarmovimientosinventario'),
+  inventoryById: diag('inventoryById', '/inventory/{id}', 'consultarmovimientoporid'),
+  inventoriesById: diag('inventoriesById', '/inventories/{id}', 'consultarmovimientoporid'),
   inventoriesTypes: diag('inventoriesTypes', '/inventories/types/all', 'consultartiposinventario'),
   inventoriesPurchases: diag(
     'inventoriesPurchases',
@@ -297,6 +299,8 @@ function probes(): Probe[] {
       RESTOBAR_OPERATIONS.listCategories,
       { pagination: true, limit: 5, page: 0 },
     ],
+    ['inventories:detalle', DIAGNOSTIC_OPS.inventoriesById, {}],
+    ['inventory:detalleDocumentado', DIAGNOSTIC_OPS.inventoryById, {}],
     ['inventory:sinParametros', DIAGNOSTIC_OPS.inventory, {}],
     ['inventories:paginado', DIAGNOSTIC_OPS.inventories, paged],
     ['inventories:tipos', DIAGNOSTIC_OPS.inventoriesTypes, {}],
@@ -589,7 +593,18 @@ async function main(): Promise<void> {
           continue;
         }
         try {
-          const body = await http.request(op, { query, token });
+          // Detalle por ID: el ID sale del propio listado (no se imprime).
+          const pathParams: Record<string, string> = {};
+          if (op.path.includes('{id}')) {
+            const list = await http.request(RESTOBAR_OPERATIONS.listInventoryMovements, {
+              query: { pagination: true, limit: 1, page: 0 },
+              token,
+            });
+            const first = (list as { data?: { _id?: string }[] } | null)?.data?.[0]?._id;
+            if (!first) throw new Error('el listado no devolvió ningún ID');
+            pathParams.id = first;
+          }
+          const body = await http.request(op, { query, token, pathParams });
           console.log(`  OK: ${count(body)}; fechas: ${dateSpan(body)}`);
         } catch (err) {
           const status = (err as { status?: number }).status;

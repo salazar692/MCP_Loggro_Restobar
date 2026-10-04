@@ -10,9 +10,9 @@ nunca valores.
 | Estado | Significado | Endpoints |
 | --- | --- | --- |
 | ✅ | Tiene herramienta y respondió bien con la API real | 38 |
-| ⛔ | No disponible: la ruta documentada responde 404 y la real exige administrador (403) | 3 |
+| ⛔ | No disponible: ruta documentada 404, ruta real que exige administrador (403) o error interno de Restobar (500) | 4 |
 | ⏸️ | Disponible, sin herramienta (duplicado, operativo o de poco uso); candidato futuro | 36 |
-| 🚫 | Excluido: consulta por ID redundante, vista de un rol operativo o efecto externo | 27 |
+| 🚫 | Excluido: consulta por ID redundante, vista de un rol operativo o efecto externo | 26 |
 
 ## Herramientas por tema
 
@@ -73,7 +73,7 @@ nunca valores.
 | `/ingredients/{id}` | 🚫 | Consulta por ID: el listado ya trae el registro y algunas exigen permisos de escritura. | [consultaringredienteporid](https://developer.loggro.com/reference/consultaringredienteporid) |
 | `/inventory` | ✅ | `restobar_list_inventory_movements`. **Ruta real: `/inventories`**. | [consultarmovimientosinventario](https://developer.loggro.com/reference/consultarmovimientosinventario) |
 | `/inventory/types/all` | ✅ | `restobar_list_inventory_types`. **Ruta real: `/inventories/types/all`**. | [consultartiposinventario](https://developer.loggro.com/reference/consultartiposinventario) |
-| `/inventory/{id}` | 🚫 | Ruta real probable `/inventories/{id}`; el listado ya trae el movimiento. | [consultarmovimientoporid](https://developer.loggro.com/reference/consultarmovimientoporid) |
+| `/inventory/{id}` | ⛔ 500 | La ruta documentada da 404; la real `/inventories/{id}` responde **HTTP 500 con `{}`** incluso con un ID tomado del propio listado (error interno de Restobar, 2026-10-04). El listado ya trae los ítems. | [consultarmovimientoporid](https://developer.loggro.com/reference/consultarmovimientoporid) |
 | `/inventory/report/purchases` | ⛔ 403 | Ruta real `/inventories/report/purchases`: «Solo usuarios administradores». Se usa `/reports/reportPurchase`. | [reportecomprasingredientes](https://developer.loggro.com/reference/reportecomprasingredientes) |
 | `/inventory/report/productions` | ⛔ | Ruta documentada 404; se usa `/reports/reportProduction`. | [reporteproduccioningredientes](https://developer.loggro.com/reference/reporteproduccioningredientes) |
 | `/inventory/report/transfers` | ⛔ | Ruta documentada 404; se usa `/reports/reportTransfers`. | [reportetrasladosingredientes](https://developer.loggro.com/reference/reportetrasladosingredientes) |

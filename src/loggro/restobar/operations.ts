@@ -96,12 +96,6 @@ export const RESTOBAR_OPERATIONS = {
     'consultarmovimientosinventario',
     '/inventory',
   ),
-  getInventoryMovement: read(
-    'getInventoryMovement',
-    '/inventories/{id}',
-    'consultarmovimientoporid',
-    '/inventory/{id}',
-  ),
   listInventoryTypes: read(
     'listInventoryTypes',
     '/inventories/types/all',
