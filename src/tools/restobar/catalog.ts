@@ -10,12 +10,13 @@ import {
   runTool,
   toRestobarPage,
 } from '../shared.ts';
+import type { Product } from '../../loggro/restobar/schemas.ts';
 import type { RestobarToolContext } from './context.ts';
 
 const nullableText = z.string().nullable();
 const nullableNumber = z.number().nullable();
 
-const ProductOut = z.object({
+export const ProductOut = z.object({
   id: z.string(),
   name: nullableText,
   categoryId: nullableText,
@@ -44,6 +45,34 @@ const ProductOut = z.object({
     .describe('Stock y precio por ubicación de inventario.'),
 });
 
+/** Producto de Restobar → salida MCP (también la usa restobar_get_product). */
+export function toProductOut(p: Product): z.infer<typeof ProductOut> {
+  return {
+    id: p._id,
+    name: p.name ?? null,
+    categoryId: p.category?.id ?? null,
+    categoryName: p.category?.name ?? null,
+    barcode: p.barcode ?? null,
+    type: p.type ?? null,
+    inventoryType: p.inventoryType ?? null,
+    price: p.price ?? null,
+    isActive: p.isActive ?? null,
+    stock: p.stock ?? null,
+    stockMinimum: p.stockMinimum ?? null,
+    purchaseCost: p.pricePurchase ?? null,
+    locations: (p.locationsStock ?? []).map((l) => ({
+      locationId: l.locationStock?.id ?? null,
+      locationName: l.locationStock?.name ?? null,
+      isMain: l.isMain ?? null,
+      stock: l.stock ?? null,
+      stockMinimum: l.stockMinimum ?? null,
+      price: l.price ?? null,
+      taxName: l.tax?.name ?? null,
+      taxPercentage: l.tax?.percentage ?? null,
+    })),
+  };
+}
+
 export function registerCatalogTools(server: McpServer, ctx: RestobarToolContext): void {
   server.registerTool(
     'restobar_list_products',
@@ -71,30 +100,7 @@ export function registerCatalogTools(server: McpServer, ctx: RestobarToolContext
           categoryId: args.categoryId,
         });
         return {
-          products: page.data.map((p) => ({
-            id: p._id,
-            name: p.name ?? null,
-            categoryId: p.category?.id ?? null,
-            categoryName: p.category?.name ?? null,
-            barcode: p.barcode ?? null,
-            type: p.type ?? null,
-            inventoryType: p.inventoryType ?? null,
-            price: p.price ?? null,
-            isActive: p.isActive ?? null,
-            stock: p.stock ?? null,
-            stockMinimum: p.stockMinimum ?? null,
-            purchaseCost: p.pricePurchase ?? null,
-            locations: (p.locationsStock ?? []).map((l) => ({
-              locationId: l.locationStock?.id ?? null,
-              locationName: l.locationStock?.name ?? null,
-              isMain: l.isMain ?? null,
-              stock: l.stock ?? null,
-              stockMinimum: l.stockMinimum ?? null,
-              price: l.price ?? null,
-              taxName: l.tax?.name ?? null,
-              taxPercentage: l.tax?.percentage ?? null,
-            })),
-          })),
+          products: page.data.map(toProductOut),
           pagination: pageInfo(
             args.page,
             args.pageSize,

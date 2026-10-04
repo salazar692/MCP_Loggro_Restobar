@@ -54,6 +54,18 @@ del negocio (por defecto `America/Bogota`).
 | `restobar_clients_summary` | Cifras de todos los clientes: total, datos de contacto, nuevos por mes, ciudades |
 | `restobar_export_clients` | Guardar todos los clientes en un Excel (`.xlsx`) en tu computador |
 | `restobar_sales_by_day` | Total facturado y número de facturas por día en un rango de fechas |
+| `restobar_sales_by_month`, `_by_product`, `_by_category`, `_by_payment_method`, `_by_seller`, `_by_biller`, `_by_table`, `_by_delivery_provider` | Ventas de un período agrupadas por mes, producto, categoría, método de pago, vendedor, cajero, mesa o canal de domicilio |
+| `restobar_orders_by_hour`, `restobar_orders_by_weekday` | Horas y días de más movimiento |
+| `restobar_product_profitability` | Ventas, costo promedio y utilidad estimada por producto |
+| `restobar_profitability_summary` | Ventas frente a gastos y compras de un período |
+| `restobar_list_expenses`, `restobar_expenses_summary`, `restobar_list_expense_types` | Gastos y egresos: detalle, totales por tipo y tipos de gasto |
+| `restobar_purchases_report`, `restobar_list_purchase_payments`, `restobar_list_providers` | Compras a proveedores, pagos de compras y proveedores |
+| `restobar_list_ingredients`, `restobar_get_product` | Ingredientes con stock y alertas de stock bajo; detalle de un producto |
+| `restobar_production_report`, `restobar_transfers_report`, `restobar_shrinkage_report` | Producción, traslados entre bodegas y mermas de inventario |
+| `restobar_list_tables`, `restobar_list_taxes`, `restobar_list_units`, `restobar_list_promos` | Mesas, impuestos, unidades de medida y promociones |
+
+Varios reportes requieren plan **premium** en Restobar; si el plan no lo permite, la herramienta lo
+explica. Estado de cada endpoint de la API en [`docs/restobar-tool-map.md`](docs/restobar-tool-map.md).
 
 **Listados grandes.** Un chat no puede mostrar miles de registros: sería lento, costoso y se cortaría.
 Cuando un listado supera 200 resultados, el servidor se lo advierte al asistente y le indica qué

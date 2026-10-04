@@ -149,12 +149,19 @@ Herramienta: `restobar_sales_by_day`.
 | `restobar_list_orders` | `complementary` siempre `null` | Es un objeto `{ isComplementary }`. |
 | Facturas | Sin método de pago, vendedor, subtotales ni desglose | Campos existentes que no se mapeaban. |
 
-## 9. Modo remoto
+## 9. Herramientas de la ampliación
+
+Gastos, compras, inventario, reportes, estadísticas y configuración se documentan en
+[`restobar-tool-map.md`](./restobar-tool-map.md) (estado de los 104 endpoints de lectura y formas
+observadas). Usan lectores tolerantes (`src/tools/restobar/extract.ts`) en lugar de esquemas Zod porque
+Loggro no publica esquemas de respuesta fiables; igual copian campo por campo.
+
+## 10. Modo remoto
 
 En un servidor remoto (ver [`remote-integration.md`](./remote-integration.md)) el mapeo de datos es
 idéntico; la única diferencia es que no existe `restobar_export_clients`.
 
-## 10. Cómo verificar o ampliar este mapa
+## 11. Cómo verificar o ampliar este mapa
 
 ```sh
 # En Claude Code en la nube (detrás de proxy) es obligatorio NODE_USE_ENV_PROXY=1:
@@ -166,6 +173,8 @@ SMOKE_RAW_SHAPE=1 NODE_USE_ENV_PROXY=1 node scripts/smoke-restobar.ts restobar_l
   `string:objectId`, `string:dígitos`, `string:texto`, `number:int`/`number:dec`, `ausente` (el campo
   falta en algunos registros) y `enum:<valor>` solo para campos de catálogo (`status`, `type`…).
   Nunca imprime valores de personas ni montos.
+- `SMOKE_PROBE=1` consulta directamente las operaciones nuevas (estado, conteo y rango de fechas, sin
+  valores) para descubrir qué endpoints existen antes de crear una herramienta.
 - `SMOKE_INVOICE_ID=<id>` prueba `restobar_get_invoice` sin gastar una solicitud de la lista.
 - `SMOKE_LEDGER=<archivo>` y `SMOKE_MAX_REQUESTS=<n>` abren una ronda con su propio tope.
 - Reglas: solo lectura, sin `POST /login`, máximo de solicitudes por herramienta, y nada de datos

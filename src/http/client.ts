@@ -129,6 +129,12 @@ function extractApiMessage(text: string): string {
   return '';
 }
 
+/** Código del error de red de `fetch` (Node lo pone en `cause.code`), sin otros detalles. */
+function networkErrorCode(err: unknown): string | undefined {
+  const cause = (err as { cause?: { code?: unknown } } | null)?.cause;
+  return typeof cause?.code === 'string' ? cause.code : undefined;
+}
+
 function retryDelayMs(res: Response | undefined, attempt: number): number {
   const retryAfter = Number(res?.headers.get('retry-after'));
   if (Number.isFinite(retryAfter) && retryAfter > 0) {
@@ -190,14 +196,27 @@ export class HttpClient {
           signal: AbortSignal.timeout(this.timeoutMs),
         });
       } catch (err) {
-        this.logger.warn('loggro.request.failed', { op: op.id, attempt });
+        const timedOut = err instanceof Error && err.name === 'TimeoutError';
+        // Nombre y código del error de red (p. ej. ECONNRESET, UND_ERR_CONNECT_TIMEOUT): sin URL,
+        // cabeceras ni cuerpo, para poder diagnosticar en los logs del servidor.
+        this.logger.warn('loggro.request.failed', {
+          op: op.id,
+          attempt,
+          error: err instanceof Error ? err.name : typeof err,
+          code: networkErrorCode(err),
+          ms: Date.now() - started,
+        });
         if (attempt < retries) {
           await this.sleep(retryDelayMs(undefined, attempt));
           continue;
         }
-        throw new LoggroError('unavailable', 'No fue posible conectar con Restobar.', {
-          cause: err,
-        });
+        throw new LoggroError(
+          'unavailable',
+          timedOut
+            ? `Restobar no respondió en ${Math.round(this.timeoutMs / 1000)} segundos. Intenta con un rango de fechas o una página más pequeña.`
+            : 'No fue posible conectar con Restobar.',
+          { cause: err },
+        );
       }
       this.logger.debug('loggro.request', {
         op: op.id,
@@ -210,7 +229,23 @@ export class HttpClient {
         await this.sleep(retryDelayMs(res, attempt));
         continue;
       }
-      const text = await readLimited(res, this.maxResponseBytes);
+      let text: string;
+      try {
+        text = await readLimited(res, this.maxResponseBytes);
+      } catch (err) {
+        if (err instanceof LoggroError) throw err;
+        // La conexión se cortó o venció el tiempo mientras llegaba el cuerpo.
+        this.logger.warn('loggro.response.failed', {
+          op: op.id,
+          status: res.status,
+          error: err instanceof Error ? err.name : typeof err,
+          code: networkErrorCode(err),
+          ms: Date.now() - started,
+        });
+        throw new LoggroError('unavailable', 'La respuesta de Restobar se interrumpió.', {
+          cause: err,
+        });
+      }
       if (!res.ok) throw new HttpStatusError(res.status, extractApiMessage(text));
       if (text.trim() === '') return null;
       try {

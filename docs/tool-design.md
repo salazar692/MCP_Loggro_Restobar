@@ -1,7 +1,8 @@
 # Diseño de herramientas MCP
 
-> **Estado:** las 10 herramientas **P1** están implementadas en `src/tools/restobar/` y probadas sin
-> red; falta la verificación contra la API real. P2 sigue como diseño. Cada herramienta se basa en un endpoint documentado oficialmente (enlace en la tabla).
+> **Estado (2026-10-04):** 37 herramientas implementadas y verificadas contra la API real. El estado de
+> cada endpoint de lectura está en [`restobar-tool-map.md`](./restobar-tool-map.md); las tablas P1/P2
+> de abajo son el diseño original. Cada herramienta se basa en un endpoint documentado oficialmente (enlace en la tabla).
 
 ## 1. Principios
 

@@ -153,6 +153,8 @@ export const DaySales = z.looseObject({
   _id: obj({ dayOfMonth: str }),
   total: num,
   count: num,
+  totalWithoutTip: num,
+  tip: num,
 });
 export type DaySales = z.infer<typeof DaySales>;
 

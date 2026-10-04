@@ -99,6 +99,12 @@ export class RestobarClient {
     return this.#page(OPS.listProducts, Product, { pagination: true, ...q });
   }
 
+  async getProduct(id: string): Promise<Product> {
+    const body = await this.#get(OPS.getProduct, { pathParams: { id } });
+    if (body === null) throw new LoggroError('not_found', genericMessage('not_found'));
+    return this.#parse(Product, body);
+  }
+
   async listCategories(): Promise<Category[]> {
     return this.#list(OPS.listCategories, Category);
   }
@@ -124,6 +130,17 @@ export class RestobarClient {
 
   async salesByDay(q: { dateInitISO: string; dateEndISO: string }): Promise<DaySales[]> {
     return this.#list(OPS.salesByDay, DaySales, q);
+  }
+
+  /**
+   * Consulta de una operación de la allowlist con la respuesta sin validar: la herramienta que la usa
+   * extrae campo por campo con lectores tolerantes. No acepta rutas libres, solo operaciones declaradas.
+   */
+  read(
+    op: AllowedOperation,
+    options: { query?: Query; pathParams?: Record<string, string> } = {},
+  ): Promise<unknown> {
+    return this.#get(op, options);
   }
 
   async #page<T extends z.ZodType>(

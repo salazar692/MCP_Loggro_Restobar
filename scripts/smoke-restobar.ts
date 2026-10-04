@@ -20,6 +20,10 @@
  *      NODE_USE_ENV_PROXY=1 node scripts/smoke-restobar.ts [herramienta ...]   (nube, detrás de proxy)
  * Con SMOKE_RAW_SHAPE=1 imprime además los campos y tipos de la respuesta cruda (sin valores),
  * combinando todos los elementos. SMOKE_INVOICE_ID=<id> fija la factura de restobar_get_invoice.
+ * Con SMOKE_PROBE=1 no usa herramientas: consulta directamente las operaciones de PROBES (o las
+ * nombradas como argumento) e imprime estado, conteo y rango de fechas (con SMOKE_RAW_SHAPE=1, también
+ * la forma cruda). Cada
+ * operación tiene su propio presupuesto (`probe:<operación>`).
  */
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -32,10 +36,11 @@ import { loadConfig } from '../src/config.ts';
 import { HttpClient } from '../src/http/client.ts';
 import { StaticTokenProvider } from '../src/loggro/restobar/auth.ts';
 import { RestobarClient } from '../src/loggro/restobar/client.ts';
-import { RESTOBAR_ALLOWLIST } from '../src/loggro/restobar/operations.ts';
+import { RESTOBAR_ALLOWLIST, RESTOBAR_OPERATIONS } from '../src/loggro/restobar/operations.ts';
 import { silentLogger } from '../src/logging.ts';
 import { createServer } from '../src/server.ts';
 import { BULK_PAGE_SIZE } from '../src/tools/restobar/clients-bulk.ts';
+import { dayRangeToIso } from '../src/tools/shared.ts';
 
 // SMOKE_MAX_REQUESTS y SMOKE_LEDGER permiten una ronda aparte con su propio tope, sin tocar el historial.
 const MAX_REQUESTS_PER_TOOL = Number(process.env.SMOKE_MAX_REQUESTS ?? 5);
@@ -56,6 +61,7 @@ interface Step {
 }
 interface Memory {
   invoiceId?: string;
+  productId?: string;
   clientsTotal?: number | null;
 }
 
@@ -92,6 +98,9 @@ function daysAgoInBogota(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Período de los reportes en la prueba: los últimos 7 días completos. */
+const lastWeek = (): Args => ({ dateFrom: daysAgoInBogota(7), dateTo: yesterdayInBogota() });
+
 const PLAN: Step[] = [
   { tool: 'restobar_list_invoices', args: () => ({ pageSize: PAGE_SIZE }), note: 'recientes' },
   {
@@ -114,7 +123,131 @@ const PLAN: Step[] = [
     tool: 'restobar_sales_by_day',
     args: () => ({ dateFrom: daysAgoInBogota(7), dateTo: yesterdayInBogota() }),
   },
+  // Ampliación: reportes, estadísticas, gastos, compras, inventario y configuración (últimos 7 días).
+  ...[
+    'restobar_list_expenses',
+    'restobar_expenses_summary',
+    'restobar_purchases_report',
+    'restobar_list_purchase_payments',
+    'restobar_production_report',
+    'restobar_transfers_report',
+    'restobar_shrinkage_report',
+    'restobar_sales_by_product',
+    'restobar_sales_by_payment_method',
+    'restobar_sales_by_seller',
+    'restobar_sales_by_table',
+    'restobar_sales_by_month',
+    'restobar_sales_by_delivery_provider',
+    'restobar_sales_by_biller',
+    'restobar_orders_by_hour',
+    'restobar_orders_by_weekday',
+    'restobar_sales_by_category',
+    'restobar_product_profitability',
+    'restobar_profitability_summary',
+  ].map((tool) => ({ tool, args: lastWeek })),
+  { tool: 'restobar_list_expense_types', args: () => ({}) },
+  { tool: 'restobar_list_providers', args: () => ({}) },
+  { tool: 'restobar_list_ingredients', args: () => ({ pageSize: PAGE_SIZE }) },
+  {
+    tool: 'restobar_get_product',
+    args: (m) =>
+      m.productId ? { id: m.productId } : 'falta un producto de restobar_list_products',
+  },
+  { tool: 'restobar_list_tables', args: () => ({}) },
+  { tool: 'restobar_list_taxes', args: () => ({}) },
+  { tool: 'restobar_list_units', args: () => ({}) },
+  { tool: 'restobar_list_promos', args: () => ({}) },
 ];
+
+type OpName = keyof typeof RESTOBAR_OPERATIONS;
+type ProbeQuery = Record<string, string | number | boolean>;
+
+/** Últimos 7 días completos (hasta ayer) en hora de Colombia, como instantes ISO. */
+function lastWeekIso(): { start: string; end: string } {
+  const { start, end } = dayRangeToIso(daysAgoInBogota(7), yesterdayInBogota(), 'America/Bogota');
+  return { start: start ?? '', end: end ?? '' };
+}
+
+/** Operaciones a sondear y su consulta: fechas en los dos nombres que usa Restobar según el endpoint. */
+function probes(): [OpName, ProbeQuery][] {
+  const { start, end } = lastWeekIso();
+  const iso = { dateInitISO: start, dateEndISO: end };
+  const plain = { dateInit: start, dateEnd: end };
+  const paged = { pagination: true, limit: 5, page: 0 };
+  return [
+    ['listExpenses', plain],
+    ['reportExpenses', plain],
+    ['listExpenseTypes', {}],
+    ['listProviders', {}],
+    ['listInventoryMovements', paged],
+    ['listInventoryTypes', {}],
+    ['inventoryPurchasesReport', iso],
+    ['inventoryProductionsReport', iso],
+    ['inventoryTransfersReport', iso],
+    ['listPurchasePayments', {}],
+    ['reportPurchases', iso],
+    ['reportProduction', iso],
+    ['reportTransfers', iso],
+    ['reportShrinkage', iso],
+    ['reportUtility', { ...iso, groupResult: true }],
+    ['reportUtilityByExpenseType', iso],
+    ['reportUtilityByDeliveryProvider', iso],
+    ['reportSalesByProduct', { ...iso, groupResult: true }],
+    ['reportSalesByCategory', iso],
+    ['salesByMonth', iso],
+    ['salesByTable', iso],
+    ['salesByPaymentMethod', iso],
+    ['salesByProduct', iso],
+    ['salesBySeller', iso],
+    ['salesByBiller', iso],
+    ['salesByDeliveryProvider', iso],
+    ['ordersByHour', iso],
+    ['ordersByWeekday', iso],
+    ['listIngredients', paged],
+    ['listUnits', {}],
+    ['listTaxes', {}],
+    ['listTables', {}],
+    ['listCashRegisters', {}],
+    ['listCashClosings', { ...paged, ...plain }],
+    ['listDeliveryProviders', {}],
+    ['listPromos', {}],
+    ['listOrderAreas', {}],
+    ['listEvents', { limit: 5 }],
+  ];
+}
+
+/** Rango de fechas (ISO o YYYY-MM-DD) presente en una respuesta; las fechas no son datos personales. */
+function dateSpan(value: unknown): string {
+  const found: string[] = [];
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}(T|$)/.test(v)) found.push(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (typeof v === 'object' && v !== null) Object.values(v).forEach(walk);
+  };
+  walk(value);
+  if (!found.length) return 'sin fechas';
+  found.sort();
+  return `${found[0]} → ${found.at(-1)} (${found.length} fechas)`;
+}
+
+function count(value: unknown): string {
+  if (Array.isArray(value)) return `arreglo de ${value.length}`;
+  if (typeof value === 'object' && value !== null) {
+    return (
+      Object.entries(value)
+        .map(([k, v]) =>
+          Array.isArray(v)
+            ? `${k}: ${v.length}`
+            : typeof v === 'number' && k === 'count'
+              ? `count: ${v}`
+              : null,
+        )
+        .filter(Boolean)
+        .join(', ') || 'objeto'
+    );
+  }
+  return typeof value;
+}
 
 /** Describe la forma de un valor sin revelarlo. */
 function shape(value: unknown, depth = 0): unknown {
@@ -338,6 +471,35 @@ async function main(): Promise<void> {
     maxRetries: 0,
     logger: silentLogger,
   });
+
+  if (env.SMOKE_PROBE === '1') {
+    const selected = probes().filter(([name]) => !only.size || only.has(name));
+    try {
+      for (const [name, query] of selected) {
+        currentTool = `probe:${name}`;
+        const op = RESTOBAR_OPERATIONS[name];
+        console.log(`\n# ${name} (${op.path})`);
+        if ((ledger[currentTool] ?? 0) >= MAX_REQUESTS_PER_TOOL) {
+          console.log('  omitida: presupuesto de solicitudes agotado');
+          continue;
+        }
+        try {
+          const body = await http.request(op, { query, token });
+          console.log(`  OK: ${count(body)}; fechas: ${dateSpan(body)}`);
+        } catch (err) {
+          const status = (err as { status?: number }).status;
+          const msg = (err as { apiMessage?: string }).apiMessage ?? (err as Error).message;
+          console.log(`  ERROR${status ? ` HTTP ${status}` : ''}: ${msg}`);
+        }
+      }
+    } finally {
+      await mkdir(path.dirname(LEDGER), { recursive: true });
+      await writeFile(LEDGER, JSON.stringify(ledger, null, 2));
+      console.log('\nSolicitudes acumuladas:', JSON.stringify(ledger));
+      await rm(exportDir, { recursive: true, force: true });
+    }
+    return;
+  }
   const server = createServer({
     // Token vacío: el cliente HTTP no envía la cabecera Authorization.
     restobar: new RestobarClient(http, new StaticTokenProvider(token)),
@@ -378,6 +540,8 @@ async function main(): Promise<void> {
       describeResult(step.tool, structured);
       const invoices = structured.invoices as { id?: string }[] | undefined;
       memory.invoiceId ??= invoices?.[0]?.id;
+      const products = structured.products as { id?: string }[] | undefined;
+      if (step.tool === 'restobar_list_products') memory.productId ??= products?.[0]?.id;
       if (step.tool === 'restobar_list_clients') {
         memory.clientsTotal = (structured.pagination as { total: number | null }).total;
       }

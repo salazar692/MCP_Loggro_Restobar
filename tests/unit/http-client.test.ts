@@ -104,6 +104,39 @@ describe('HttpClient: reintentos y respuestas', () => {
 });
 
 describe('buildUrl', () => {
+  it('distingue un tiempo de espera vencido de un fallo de red y registra el código', async () => {
+    const warnings: Record<string, unknown>[] = [];
+    const logger = {
+      debug() {},
+      info() {},
+      warn: (_msg: string, fields?: Record<string, unknown>) => void warnings.push(fields ?? {}),
+      error() {},
+    };
+    const failing = (err: Error) =>
+      new HttpClient({
+        baseUrl: BASE,
+        allowlist: [listOp],
+        fetch: () => Promise.reject(err),
+        sleep: noSleep,
+        maxRetries: 1,
+        logger,
+      });
+    const timeout = Object.assign(new Error('aborted'), { name: 'TimeoutError' });
+    const timedOut = failing(timeout).request(listOp, { pathParams: { id: '1' } });
+    await expect(timedOut).rejects.toMatchObject({ kind: 'unavailable' });
+    await expect(timedOut).rejects.toThrow(/no respondió en 20 segundos/);
+    const network = Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } });
+    await expect(
+      failing(network).request(listOp, { pathParams: { id: '1' } }),
+    ).rejects.toMatchObject({
+      kind: 'unavailable',
+      message: 'No fue posible conectar con Restobar.',
+    });
+    expect(warnings.at(-1)).toMatchObject({ op: 't.list', error: 'TypeError', code: 'ECONNRESET' });
+    // Un intento más un reintento por cada solicitud.
+    expect(warnings).toHaveLength(4);
+  });
+
   it('exige los parámetros de ruta', () => {
     expect(() => buildUrl(BASE, '/items/{id}')).toThrow(/id/);
   });
